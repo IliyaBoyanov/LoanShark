@@ -64,18 +64,12 @@ public class LoanControllerTest {
                 .get().uri("/api/v1/loans/loanTypes")
                 .headers(http -> http.setBearerAuth(tokenString))
                 .exchange()
-                .expectStatus().isOk()
-                .expectBody().json("""
-                        [
-                            {
-                                "id": 1,
-                                "months": 6,
-                                "totalAmount": 15000,
-                                "interest": 7.50,
-                                "monthlyPayment": 1232.45
-                            }
-                        ]
-                        """, true);
+                .expectStatus().isOk().expectBody()
+                .jsonPath("$.[0].id").isEqualTo("1")
+                .jsonPath("$.[0].months").isEqualTo("6")
+                .jsonPath("$.[0].totalAmount").isEqualTo("15000")
+                .jsonPath("$.[0].interest").isEqualTo("7.50")
+                .jsonPath("$.[0].monthlyPayment").isEqualTo("1232.45");
     }
 
 
@@ -87,6 +81,7 @@ public class LoanControllerTest {
         LoanDto loanDto = new LoanDto();
         loanDto.id = 1L;
         loanDto.loanType = new LoanType();
+        loanDto.loanType.setId(123L);
         loanDto.principalAmount = BigDecimal.valueOf(1533.45);
         doNothing().when(idempotentService).validateIdempotentRequest(any());
         when(loanService.apply(1L, 3L)).thenReturn(loanDto);
@@ -96,22 +91,10 @@ public class LoanControllerTest {
                 .headers(http -> http.setBearerAuth(tokenString))
                 .headers(http -> http.set("idempotent-key", "value1"))
                 .exchange()
-                .expectStatus().isOk().expectBody().json("""
-                          {
-                                "id": 1,
-                                "userId": null,
-                                "status": null,
-                                "loanType": {
-                                                  "id": null,
-                                                  "months": null,
-                                                  "totalAmount": null,
-                                                  "interest": null,
-                                                  "monthlyPayment": null
-                                                },
-                                "principalAmount": 1533.45,
-                                "remainingDebt": null
-                           }
-                        """, true);
+                .expectStatus().isOk().expectBody()
+                .jsonPath("$.id").isEqualTo("1")
+                .jsonPath("$.principalAmount").isEqualTo("1533.45")
+                .jsonPath("$.loanType.id").isEqualTo("123");
 
     }
 
