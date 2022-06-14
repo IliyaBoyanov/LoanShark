@@ -69,36 +69,7 @@ public class LoanService {
         return LoanDto.from(newLoan);
     }
 
-    private Loan createNewLoan(LoanType loanType, Long userId) {
-        BigDecimal monthlyPayment = loanType.getMonthlyPayment();
-        if (monthlyPayment == null) {
-            monthlyPayment = calculateMonthlyPayment(loanType);
-            loanType.setMonthlyPayment(monthlyPayment.setScale(2, RoundingMode.HALF_EVEN));
-            loanTypeRepository.save(loanType);
-        }
-
-        return Loan.builder()
-                .loanType(loanType)
-                .appliedOn(LocalDateTime.now())
-                .status(ELoanStatus.ACTIVE)
-                .userId(userId)
-                .remainingDebt(loanType.getTotalAmount())
-                .principalAmount(BigDecimal.ZERO)
-                .build();
-    }
-
-    private BigDecimal calculateMonthlyPayment(LoanType loanType) {
-        BigDecimal in = loanType.getInterest().multiply(BigDecimal.valueOf(.01)).divide(BigDecimal.valueOf(12.0), RoundingMode.DOWN);
-        return loanType.getTotalAmount().multiply(BigDecimal.ONE.add(in).pow(loanType.getMonths())
-                        .multiply(in))
-                .divide(BigDecimal.ONE.add(in).pow(loanType.getMonths()).subtract(BigDecimal.ONE), RoundingMode.DOWN);
-    }
-
-    public List<LoanType> getAllLoanTypes() {
-        return loanTypeRepository.findAll();
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public PaymentDto makePayment(PaymentFormRequest paymentDto) {
         Optional<Loan> optionalLoan = loanRepository.findWithLockingById(paymentDto.loanId);
         Optional<User> optionalUser = userRepository.findById(paymentDto.userId);
@@ -141,18 +112,6 @@ public class LoanService {
         return PaymentDto.from(payment);
     }
 
-    private BigDecimal calculatePrincipal(Loan loan) {
-        return loan.getLoanType().getMonthlyPayment().subtract(loan.getLoanType().getTotalAmount().subtract(loan.getPrincipalAmount())
-                .multiply(loan.getLoanType().getInterest()
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_EVEN).divide(BigDecimal.valueOf(loan.getLoanType().getMonths()), RoundingMode.HALF_EVEN)));
-    }
-
-    private BigDecimal calculatePrincipal(Loan loan, BigDecimal futurePrincipalAmount) {
-        return loan.getLoanType().getMonthlyPayment().subtract(loan.getLoanType().getTotalAmount().subtract(futurePrincipalAmount)
-                .multiply(loan.getLoanType().getInterest()
-                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_EVEN).divide(BigDecimal.valueOf(loan.getLoanType().getMonths()), RoundingMode.HALF_EVEN)));
-    }
-
     public List<ScheduleDto> getSchedule(Long loanId, Long userId) {
         Optional<Loan> optionalLoan = loanRepository.findById(loanId);
         Optional<User> optionalUser = userRepository.findById(userId);
@@ -185,15 +144,6 @@ public class LoanService {
         return scheduleDtos;
     }
 
-    private void validateLoanAndUserIds(Long loanId, Long userId, Optional<Loan> optionalLoan, Optional<User> optionalUser) {
-        if (!optionalLoan.isPresent() || !optionalLoan.get().getUserId().equals(userId)) {
-            throw new IllegalArgumentException(INVALID_LOAN_WITH_ID + loanId);
-        }
-        if (!optionalUser.isPresent()) {
-            throw new IllegalArgumentException(String.format(USER_WITH_ID_DOES_NOT_EXIST, userId));
-        }
-    }
-
     public PaymentFormResponse getPaymentForm(Long userId, Long loanId) {
         Optional<Loan> optionalLoan = loanRepository.findById(loanId);
         Optional<User> optionalUser = userRepository.findById(userId);
@@ -209,5 +159,55 @@ public class LoanService {
         paymentRequest.version = optionalLoan.get().getVersion();
 
         return paymentRequest;
+    }
+
+    private Loan createNewLoan(LoanType loanType, Long userId) {
+        BigDecimal monthlyPayment = loanType.getMonthlyPayment();
+        if (monthlyPayment == null) {
+            monthlyPayment = calculateMonthlyPayment(loanType);
+            loanType.setMonthlyPayment(monthlyPayment.setScale(2, RoundingMode.HALF_EVEN));
+            loanTypeRepository.save(loanType);
+        }
+
+        return Loan.builder()
+                .loanType(loanType)
+                .appliedOn(LocalDateTime.now())
+                .status(ELoanStatus.ACTIVE)
+                .userId(userId)
+                .remainingDebt(loanType.getTotalAmount())
+                .principalAmount(BigDecimal.ZERO)
+                .build();
+    }
+
+    public List<LoanType> getAllLoanTypes() {
+        return loanTypeRepository.findAll();
+    }
+
+    private BigDecimal calculatePrincipal(Loan loan, BigDecimal futurePrincipalAmount) {
+        return loan.getLoanType().getMonthlyPayment().subtract(loan.getLoanType().getTotalAmount().subtract(futurePrincipalAmount)
+                .multiply(loan.getLoanType().getInterest()
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_EVEN).divide(BigDecimal.valueOf(loan.getLoanType().getMonths()), RoundingMode.HALF_EVEN)));
+    }
+
+    private BigDecimal calculateMonthlyPayment(LoanType loanType) {
+        BigDecimal in = loanType.getInterest().multiply(BigDecimal.valueOf(.01)).divide(BigDecimal.valueOf(12.0), RoundingMode.DOWN);
+        return loanType.getTotalAmount().multiply(BigDecimal.ONE.add(in).pow(loanType.getMonths())
+                        .multiply(in))
+                .divide(BigDecimal.ONE.add(in).pow(loanType.getMonths()).subtract(BigDecimal.ONE), RoundingMode.DOWN);
+    }
+
+    private BigDecimal calculatePrincipal(Loan loan) {
+        return loan.getLoanType().getMonthlyPayment().subtract(loan.getLoanType().getTotalAmount().subtract(loan.getPrincipalAmount())
+                .multiply(loan.getLoanType().getInterest()
+                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_EVEN).divide(BigDecimal.valueOf(loan.getLoanType().getMonths()), RoundingMode.HALF_EVEN)));
+    }
+
+    private void validateLoanAndUserIds(Long loanId, Long userId, Optional<Loan> optionalLoan, Optional<User> optionalUser) {
+        if (!optionalLoan.isPresent() || !optionalLoan.get().getUserId().equals(userId)) {
+            throw new IllegalArgumentException(INVALID_LOAN_WITH_ID + loanId);
+        }
+        if (!optionalUser.isPresent()) {
+            throw new IllegalArgumentException(String.format(USER_WITH_ID_DOES_NOT_EXIST, userId));
+        }
     }
 }
