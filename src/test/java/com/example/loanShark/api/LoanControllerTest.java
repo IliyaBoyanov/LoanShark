@@ -1,7 +1,10 @@
 package com.example.loanShark.api;
 
 import com.example.loanShark.dtos.LoanDto;
+import com.example.loanShark.dtos.PaymentDto;
+import com.example.loanShark.dtos.PaymentFormRequest;
 import com.example.loanShark.exceptions.IdempotentKeyNotUnique;
+import com.example.loanShark.model.EPaymentActions;
 import com.example.loanShark.model.LoanType;
 import com.example.loanShark.security.models.UserDetailsImpl;
 import com.example.loanShark.security.services.UserDetailsServiceImpl;
@@ -113,7 +116,7 @@ public class LoanControllerTest {
     }
 
     @Test
-    public void applyForLoanNotIdempotentExpect409Conflict() {
+    public void applyForLoanThrowIdempotentKeyNotUniqueExpect409Conflict() {
         UserDetailsImpl testUser = authHelperTest.getUserDetails(3L, "user", "user@email", "ROLE_USER");
         String tokenString = authHelperTest.getValidJtwToken(testUser);
         when(userDetailsService.loadUserByUsername("user@email")).thenReturn(testUser);
@@ -129,6 +132,69 @@ public class LoanControllerTest {
                 .headers(http -> http.set("idempotent-key", "value1"))
                 .exchange()
                 .expectStatus().isEqualTo(409);
+    }
+
+    @Test
+    public void applyForLoanWhenAdminWhenRoleIsAdminExpectForbidden() {
+        UserDetailsImpl testUser = authHelperTest.getUserDetails(3L, "user", "user@email", "ROLE_ADMIN");
+        String tokenString = authHelperTest.getValidJtwToken(testUser);
+        when(userDetailsService.loadUserByUsername("user@email")).thenReturn(testUser);
+        LoanDto loanDto = new LoanDto();
+        loanDto.id = 1L;
+        loanDto.loanType = new LoanType();
+        doThrow(new IdempotentKeyNotUnique("exception","code")).when(idempotentService).validateIdempotentRequest(any());
+        when(loanService.apply(1L, 3L)).thenReturn(loanDto);
+
+        client
+                .post().uri("/api/v1/loans/loanTypes/1/apply")
+                .headers(http -> http.setBearerAuth(tokenString))
+                .headers(http -> http.set("idempotent-key", "value1"))
+                .exchange()
+                .expectStatus().isForbidden();
+    }
+
+    @Test
+    public void makePaymentExpectOk() {
+        UserDetailsImpl testUser = authHelperTest.getUserDetails(3L, "user", "user@email", "ROLE_USER");
+        String tokenString = authHelperTest.getValidJtwToken(testUser);
+        when(userDetailsService.loadUserByUsername("user@email")).thenReturn(testUser);
+
+        doNothing().when(idempotentService).validateIdempotentRequest(any());
+        PaymentFormRequest request = new PaymentFormRequest();
+        request.loanId = 1L;
+        request.paymentActions = EPaymentActions.PAY;
+        PaymentDto paymentDto = new PaymentDto();
+        when(loanService.makePayment(request)).thenReturn(paymentDto);
+
+        client
+                .post().uri("/api/v1/loans/payment")
+                .headers(http -> http.setBearerAuth(tokenString))
+                .headers(http -> http.set("idempotent-key", "value1"))
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    public void makePaymentWhenUserActionForgiveExpectForbidden() {
+        UserDetailsImpl testUser = authHelperTest.getUserDetails(3L, "user", "user@email", "ROLE_USER");
+        String tokenString = authHelperTest.getValidJtwToken(testUser);
+        when(userDetailsService.loadUserByUsername("user@email")).thenReturn(testUser);
+
+        doNothing().when(idempotentService).validateIdempotentRequest(any());
+        PaymentFormRequest request = new PaymentFormRequest();
+        request.loanId = 1L;
+        request.paymentActions = EPaymentActions.FORGIVE;
+        PaymentDto paymentDto = new PaymentDto();
+        when(loanService.makePayment(request)).thenReturn(paymentDto);
+
+        client
+                .post().uri("/api/v1/loans/payment")
+                .headers(http -> http.setBearerAuth(tokenString))
+                .headers(http -> http.set("idempotent-key", "value1"))
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isForbidden();
     }
 
 }
