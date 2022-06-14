@@ -3,6 +3,7 @@ package com.example.loanShark.api;
 import com.example.loanShark.dtos.LoanDto;
 import com.example.loanShark.dtos.PaymentDto;
 import com.example.loanShark.dtos.PaymentFormRequest;
+import com.example.loanShark.exceptions.IdempotentKeyNotUnique;
 import com.example.loanShark.model.EPaymentActions;
 import com.example.loanShark.model.LoanType;
 import com.example.loanShark.security.models.UserDetailsImpl;
@@ -25,6 +26,7 @@ import java.util.List;
 public class LoanController {
 
     public static final String YOUR_ACCOUNT_CANNOT_PERFORM_FORGIVE = "Your account can't perform action: ";
+
     private LoanService loanService;
     private IdempotentService idempotentService;
 

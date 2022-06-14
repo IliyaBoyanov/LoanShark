@@ -29,7 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    private static final String INVALID_TOKEN = "Invalid Token!";
+    private static final String INVALID_TOKEN = "Invalid JWT Token!";
     private static final String AUTHENTICATED_USER_MESSAGE = "Authenticated user with email %s, setting security context! ";
 
     private static final String TOKEN_PREFIX = "Bearer ";

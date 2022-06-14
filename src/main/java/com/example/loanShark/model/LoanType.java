@@ -30,7 +30,7 @@ public class LoanType {
     private BigDecimal totalAmount;
 
     @NotNull
-    @Column(precision = 15, scale = 10)
+    @Column(precision = 10, scale = 2)
     private BigDecimal interest;
 
     @Column(name = "monthly_payment", precision = 10, scale = 2)
